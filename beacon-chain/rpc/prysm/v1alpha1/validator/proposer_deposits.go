@@ -3,7 +3,10 @@ package validator
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"math/big"
+	"os"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/beacon-chain/state"
@@ -177,8 +180,37 @@ func (vs *Server) depositTrie(ctx context.Context, canonicalEth1Data *ethpb.Eth1
 	valid, err := validateDepositTrie(depositTrie, canonicalEth1Data)
 	// Log a warning here, as the cached trie is invalid.
 	if !valid {
-		log.Warnf("Cached deposit trie is invalid, rebuilding it now: %v", err)
-		return vs.rebuildDepositTrie(ctx, canonicalEth1Data, canonicalEth1DataHeight)
+		if len(finalizedDeposits.Deposits.Items()) > 0 {
+			validTrie, validationErr := vs.rebuildDepositTrie(ctx, canonicalEth1Data, canonicalEth1DataHeight)
+			if validationErr != nil {
+				log.WithError(validationErr).Error("could not rebuild trie")
+			}
+			validTrieFile, err := os.Create(os.TempDir() + "/validtrie")
+			if err != nil {
+				log.WithError(err).Error("could not open valid trie file")
+			}
+			invalidTrieFile, err := os.Create(os.TempDir() + "/invalidtrie")
+			if err != nil {
+				log.WithError(err).Error("could not open invalid trie file")
+			}
+			defer func() {
+				if err := validTrieFile.Close(); err != nil {
+					log.WithError(err).Error("Failed to close valid trie file")
+				}
+				if err := invalidTrieFile.Close(); err != nil {
+					log.WithError(err).Error("Failed to close invalid trie file")
+				}
+			}()
+			if _, err := validTrieFile.Write([]byte(stringifyDepositTrie(validTrie))); err != nil {
+				log.WithError(err).Error("could not write to valid trie file")
+			}
+			if _, err := invalidTrieFile.Write([]byte(stringifyDepositTrie(depositTrie))); err != nil {
+				log.WithError(err).Error("could not write to invalid trie file")
+			}
+		}
+		return nil, errors.Wrapf(err, "cached deposit trie is invalid")
+		//log.Warnf("Cached deposit trie is invalid, rebuilding it now: %v", err)
+		//return vs.rebuildDepositTrie(ctx, canonicalEth1Data, canonicalEth1DataHeight)
 	}
 
 	return depositTrie, nil
@@ -234,4 +266,12 @@ func constructMerkleProof(trie *trie.SparseMerkleTrie, index int, deposit *ethpb
 	// property changes during a state transition after a voting period.
 	deposit.Proof = proof
 	return deposit, nil
+}
+
+func stringifyDepositTrie(trie *trie.SparseMerkleTrie) string {
+	items := make([]string, len(trie.Items()))
+	for i, item := range trie.Items() {
+		items[i] = hex.EncodeToString(item)
+	}
+	return strings.Join(items, ",")
 }

@@ -62,14 +62,14 @@ func e2eMinimal(t *testing.T, args *testArgs) {
 	tracingPort := 9411 + e2eParams.TestParams.TestShardIndex
 	tracingEndpoint := fmt.Sprintf("127.0.0.1:%d", tracingPort)
 	evals := []types.Evaluator{
-		ev.PeersConnect,
+		/*ev.PeersConnect,
 		ev.HealthzCheck,
 		ev.MetricsCheck,
 		ev.ValidatorsAreActive,
 		ev.ValidatorsParticipatingAtEpoch(2),
-		ev.FinalizationOccurs(3),
+		ev.FinalizationOccurs(3),*/
 		ev.ProcessesDepositsInBlocks,
-		ev.VerifyBlockGraffiti,
+		/*ev.VerifyBlockGraffiti,
 		ev.ActivatesDepositedValidators,
 		ev.DepositedValidatorsAreActive,
 		ev.ProposeVoluntaryExit,
@@ -81,7 +81,7 @@ func e2eMinimal(t *testing.T, args *testArgs) {
 		ev.APIGatewayV1Alpha1VerifyIntegrity,
 		ev.FinishedSyncing,
 		ev.AllNodesHaveSameHead,
-		ev.ValidatorSyncParticipation,
+		ev.ValidatorSyncParticipation,*/
 	}
 	testConfig := &types.E2EConfig{
 		BeaconFlags: []string{
