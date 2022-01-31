@@ -129,7 +129,7 @@ func (r *testRunner) run() {
 	}
 
 	// Validator nodes.
-	validatorNodes := components.NewValidatorNodeSet(config)
+	//validatorNodes := components.NewValidatorNodeSet(config)
 	g.Go(func() error {
 		comps := []e2etypes.ComponentRunner{beaconNodes}
 		if config.UseWeb3RemoteSigner {
@@ -138,9 +138,9 @@ func (r *testRunner) run() {
 		if err := helpers.ComponentsStarted(ctx, comps); err != nil {
 			return errors.Wrap(err, "validator nodes require beacon nodes to run")
 		}
-		if err := validatorNodes.Start(ctx); err != nil {
+		/*if err := validatorNodes.Start(ctx); err != nil {
 			return errors.Wrap(err, "failed to start validator nodes")
-		}
+		}*/
 		return nil
 	})
 
@@ -154,7 +154,7 @@ func (r *testRunner) run() {
 
 		// Wait for all required nodes to start.
 		requiredComponents := []e2etypes.ComponentRunner{
-			tracingSink, eth1Node, bootNode, beaconNodes, validatorNodes,
+			tracingSink, eth1Node, bootNode, beaconNodes,
 		}
 		ctxAllNodesReady, cancel := context.WithTimeout(ctx, allNodesStartTimeout)
 		defer cancel()
