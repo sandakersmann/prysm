@@ -129,7 +129,7 @@ func (r *testRunner) run() {
 	}
 
 	// Validator nodes.
-	//validatorNodes := components.NewValidatorNodeSet(config)
+	/*validatorNodes := components.NewValidatorNodeSet(config)
 	g.Go(func() error {
 		comps := []e2etypes.ComponentRunner{beaconNodes}
 		if config.UseWeb3RemoteSigner {
@@ -138,11 +138,11 @@ func (r *testRunner) run() {
 		if err := helpers.ComponentsStarted(ctx, comps); err != nil {
 			return errors.Wrap(err, "validator nodes require beacon nodes to run")
 		}
-		/*if err := validatorNodes.Start(ctx); err != nil {
+		if err := validatorNodes.Start(ctx); err != nil {
 			return errors.Wrap(err, "failed to start validator nodes")
-		}*/
+		}
 		return nil
-	})
+	})*/
 
 	// Run E2E evaluators and tests.
 	g.Go(func() error {
