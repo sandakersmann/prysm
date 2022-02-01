@@ -209,9 +209,9 @@ func (r *testRunner) run() {
 		if err := r.testBeaconChainSync(ctx, g, conns, tickingStartTime, bootNode.ENR()); err != nil {
 			return errors.Wrap(err, "beacon chain sync test failed")
 		}
-		if err := r.testDoppelGangerProtection(ctx); err != nil {
+		/*if err := r.testDoppelGangerProtection(ctx); err != nil {
 			return errors.Wrap(err, "doppel ganger protection check failed")
-		}
+		}*/
 		return nil
 	})
 
