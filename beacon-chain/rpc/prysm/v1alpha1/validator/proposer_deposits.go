@@ -212,8 +212,7 @@ func (vs *Server) depositTrie(ctx context.Context, canonicalEth1Data *ethpb.Eth1
 		if _, err := invalidTrieFile.Write([]byte(stringifyDepositTrie(depositTrie))); err != nil {
 			log.WithError(err).Error("could not write to invalid trie file")
 		}
-		log.Error("Forcing test to fail at deposit limit...")
-		return nil, errors.Wrapf(err, "forced test to fail at deposit limit")
+		return nil, errors.Wrapf(err, "forced test to fail")
 	}
 
 	return depositTrie, nil
