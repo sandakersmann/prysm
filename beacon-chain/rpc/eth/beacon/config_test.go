@@ -31,6 +31,7 @@ func TestGetSpec(t *testing.T) {
 	config.HysteresisQuotient = 9
 	config.HysteresisDownwardMultiplier = 10
 	config.HysteresisUpwardMultiplier = 11
+	config.SafeSlotsToImportOptimistically = 128
 	config.SafeSlotsToUpdateJustified = 12
 	config.Eth1FollowDistance = 13
 	config.TargetAggregatorsPerCommittee = 14
@@ -130,7 +131,7 @@ func TestGetSpec(t *testing.T) {
 	resp, err := server.GetSpec(context.Background(), &emptypb.Empty{})
 	require.NoError(t, err)
 
-	assert.Equal(t, 97, len(resp.Data))
+	assert.Equal(t, 100, len(resp.Data))
 	for k, v := range resp.Data {
 		switch k {
 		case "CONFIG_NAME":
@@ -331,12 +332,18 @@ func TestGetSpec(t *testing.T) {
 			assert.Equal(t, "73", v)
 		case "FeeRecipient":
 			assert.Equal(t, common.HexToAddress("FeeRecipient"), v)
-		case "PROPORTIONAL_SLASHING_MULTIPLIER_MERGE":
+		case "PROPORTIONAL_SLASHING_MULTIPLIER_BELLATRIX":
 			assert.Equal(t, "3", v)
-		case "MIN_SLASHING_PENALTY_QUOTIENT_MERGE":
+		case "MIN_SLASHING_PENALTY_QUOTIENT_BELLATRIX":
 			assert.Equal(t, "32", v)
-		case "INACTIVITY_PENALTY_QUOTIENT_MERGE":
+		case "INACTIVITY_PENALTY_QUOTIENT_BELLATRIX":
 			assert.Equal(t, "16777216", v)
+		case "PROPOSER_SCORE_BOOST":
+			assert.Equal(t, "70", v)
+		case "INTERVALS_PER_SLOT":
+			assert.Equal(t, "3", v)
+		case "SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY":
+			assert.Equal(t, "128", v)
 		default:
 			t.Errorf("Incorrect key: %s", k)
 		}
