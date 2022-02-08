@@ -153,6 +153,17 @@ func (r *testRunner) run() {
 		})
 	}
 
+	g.Go(func() error {
+		comps := []e2etypes.ComponentRunner{beaconNodes}
+		if config.UseWeb3RemoteSigner {
+			comps = append(comps, web3RemoteSigner)
+		}
+		if err := helpers.ComponentsStarted(ctx, comps); err != nil {
+			return errors.Wrap(err, "validator nodes require beacon nodes to run")
+		}
+		return nil
+	})
+
 	if multiClientActive {
 		// Lighthouse Validator nodes.
 		lighthouseValidatorNodes = components.NewLighthouseValidatorNodeSet(config)

@@ -132,9 +132,9 @@ func processesDepositsInBlocks(conns ...*grpc.ClientConn) error {
 		)
 		numDeposits += uint64(len(deposits))
 	}
-	/*if numDeposits != depositValCount {
+	if numDeposits != depositValCount {
 		return fmt.Errorf("expected %d deposits to be processed, received %d", depositValCount, numDeposits)
-	}*/
+	}
 	return nil
 }
 

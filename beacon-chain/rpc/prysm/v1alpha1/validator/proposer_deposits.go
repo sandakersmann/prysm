@@ -209,8 +209,6 @@ func (vs *Server) depositTrie(ctx context.Context, canonicalEth1Data *ethpb.Eth1
 			}
 		}
 		return nil, errors.Wrapf(err, "cached deposit trie is invalid")
-		//log.Warnf("Cached deposit trie is invalid, rebuilding it now: %v", err)
-		//return vs.rebuildDepositTrie(ctx, canonicalEth1Data, canonicalEth1DataHeight)
 	}
 
 	return depositTrie, nil

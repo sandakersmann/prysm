@@ -51,7 +51,7 @@ var StandardBeaconCount = 2
 var StandardLighthouseNodeCount = 2
 
 // DepositCount is the amount of deposits E2E makes on a separate validator client.
-var DepositCount = uint64(64)
+var DepositCount = uint64(86400)
 
 // Values that are used by both the beacon node and validator clients
 // to assign the relevant ports to.
