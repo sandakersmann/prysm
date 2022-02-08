@@ -193,7 +193,7 @@ func (r *testRunner) run() {
 
 		// Wait for all required nodes to start.
 		requiredComponents := []e2etypes.ComponentRunner{
-			tracingSink, eth1Node, bootNode, beaconNodes,
+			tracingSink, eth1Node, bootNode, beaconNodes, validatorNodes,
 		}
 		if multiClientActive {
 			requiredComponents = append(requiredComponents, []e2etypes.ComponentRunner{keyGen, lighthouseNodes, lighthouseValidatorNodes}...)
