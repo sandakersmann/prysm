@@ -47,7 +47,7 @@ var ValidatorLogFileName = "vals-%d.log"
 var StandardBeaconCount = 2
 
 // DepositCount is the amount of deposits E2E makes on a separate validator client.
-var DepositCount = uint64(86400)
+var DepositCount = uint64(64)
 
 // Init initializes the E2E config, properly handling test sharding.
 func Init(beaconNodeCount int) error {
