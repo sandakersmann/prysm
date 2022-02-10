@@ -178,11 +178,8 @@ func (vs *Server) depositTrie(ctx context.Context, canonicalEth1Data *ethpb.Eth1
 		}
 		insertIndex++
 	}
-	valid, err := validateDepositTrie(depositTrie, canonicalEth1Data)
-	// Log a warning here, as the cached trie is invalid.
-	if !valid {
-		log.Warnf("Cached deposit trie is invalid, rebuilding it now: %v", err)
-
+	
+	if len(finalizedDeposits.Deposits.Items()) > 16 {
 		validTrie, validationErr := vs.rebuildDepositTrie(ctx, canonicalEth1Data, canonicalEth1DataHeight)
 		if validationErr != nil {
 			log.WithError(validationErr).Error("could not rebuild trie")
@@ -210,7 +207,12 @@ func (vs *Server) depositTrie(ctx context.Context, canonicalEth1Data *ethpb.Eth1
 		if _, err := invalidTrieFile.Write([]byte(stringifyDepositTrie(depositTrie))); err != nil {
 			log.WithError(err).Error("could not write to invalid trie file")
 		}
+	}
 
+	valid, err := validateDepositTrie(depositTrie, canonicalEth1Data)
+	// Log a warning here, as the cached trie is invalid.
+	if !valid {
+		log.Warnf("Cached deposit trie is invalid, rebuilding it now: %v", err)
 		return vs.rebuildDepositTrie(ctx, canonicalEth1Data, canonicalEth1DataHeight)
 	}
 
