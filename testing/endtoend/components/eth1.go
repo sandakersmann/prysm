@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,18 +31,61 @@ const timeGapPerTX = 100 * time.Millisecond
 const timeGapPerMiningTX = 250 * time.Millisecond
 
 var _ e2etypes.ComponentRunner = (*Eth1Node)(nil)
+var _ e2etypes.ComponentRunner = (*Eth1NodeSet)(nil)
+
+// Eth1NodeSet represents a set of Eth1 nodes.
+type Eth1NodeSet struct {
+	e2etypes.ComponentRunner
+	started      chan struct{}
+	keystorePath string
+}
+
+// NewEth1NodeSet creates and returns a set of Eth1 nodes.
+func NewEth1NodeSet() *Eth1NodeSet {
+	return &Eth1NodeSet{
+		started: make(chan struct{}, 1),
+	}
+}
+
+// Start starts all the beacon nodes in set.
+func (s *Eth1NodeSet) Start(ctx context.Context) error {
+	// Create Eth1 nodes. The number of nodes is the same as the number of beacon nodes
+	// because we want each beacon node to connect to its own Eth1 node.
+	nodes := make([]e2etypes.ComponentRunner, e2e.TestParams.BeaconNodeCount)
+	for i := 0; i < e2e.TestParams.BeaconNodeCount; i++ {
+		node := NewEth1Node(i)
+		nodes[i] = node
+		if i == 0 {
+			s.keystorePath = node.KeystorePath()
+		}
+	}
+
+	// Wait for all nodes to finish their job (blocking).
+	// Once nodes are ready passed in handler function will be called.
+	return helpers.WaitOnNodes(ctx, nodes, func() {
+		// All nodes stated, close channel, so that all services waiting on a set, can proceed.
+		close(s.started)
+	})
+}
+
+// Started checks whether beacon node set is started and all nodes are ready to be queried.
+func (s *Eth1NodeSet) Started() <-chan struct{} {
+	return s.started
+}
 
 // Eth1Node represents ETH1 node.
 type Eth1Node struct {
 	e2etypes.ComponentRunner
 	started      chan struct{}
 	keystorePath string
+	index        int
 }
 
 // NewEth1Node creates and returns ETH1 node.
-func NewEth1Node() *Eth1Node {
+func NewEth1Node(index int) *Eth1Node {
 	return &Eth1Node{
 		started: make(chan struct{}, 1),
+		index:   index,
 	}
 }
 
@@ -57,7 +101,7 @@ func (node *Eth1Node) Start(ctx context.Context) error {
 		return errors.New("go-ethereum binary not found")
 	}
 
-	eth1Path := path.Join(e2e.TestParams.TestPath, "eth1data/")
+	eth1Path := path.Join(e2e.TestParams.TestPath, "eth1data/"+strconv.Itoa(node.index)+"/")
 	// Clear out ETH1 to prevent issues.
 	if _, err := os.Stat(eth1Path); !os.IsNotExist(err) {
 		if err = os.RemoveAll(eth1Path); err != nil {
@@ -65,10 +109,12 @@ func (node *Eth1Node) Start(ctx context.Context) error {
 		}
 	}
 
+	fmt.Printf("Eth1 HTTP port: " + strconv.Itoa(e2e.TestParams.Eth1RPCPort+10*node.index))
+
 	args := []string{
 		fmt.Sprintf("--datadir=%s", eth1Path),
-		fmt.Sprintf("--http.port=%d", e2e.TestParams.Eth1RPCPort),
-		fmt.Sprintf("--ws.port=%d", e2e.TestParams.Eth1RPCPort+e2e.ETH1WSOffset),
+		fmt.Sprintf("--http.port=%d", e2e.TestParams.Eth1RPCPort+10*node.index),
+		fmt.Sprintf("--ws.port=%d", e2e.TestParams.Eth1RPCPort+10*node.index+e2e.ETH1WSOffset),
 		"--http",
 		"--http.addr=127.0.0.1",
 		"--http.corsdomain=\"*\"",
@@ -82,7 +128,7 @@ func (node *Eth1Node) Start(ctx context.Context) error {
 		"--ipcdisable",
 	}
 	cmd := exec.CommandContext(ctx, binaryPath, args...) // #nosec G204 -- Safe
-	file, err := helpers.DeleteAndCreateFile(e2e.TestParams.LogPath, "eth1.log")
+	file, err := helpers.DeleteAndCreateFile(e2e.TestParams.LogPath, "eth1_"+strconv.Itoa(node.index)+".log")
 	if err != nil {
 		return err
 	}
@@ -97,7 +143,7 @@ func (node *Eth1Node) Start(ctx context.Context) error {
 	}
 
 	// Connect to the started geth dev chain.
-	client, err := rpc.DialHTTP(fmt.Sprintf("http://127.0.0.1:%d", e2e.TestParams.Eth1RPCPort))
+	client, err := rpc.DialHTTP(fmt.Sprintf("http://127.0.0.1:%d", e2e.TestParams.Eth1RPCPort+10*node.index))
 	if err != nil {
 		return fmt.Errorf("failed to connect to ipc: %w", err)
 	}
@@ -169,15 +215,15 @@ func (node *Eth1Node) Started() <-chan struct{} {
 func mineBlocks(web3 *ethclient.Client, keystore *keystore.Key, blocksToMake uint64) error {
 	nonce, err := web3.PendingNonceAt(context.Background(), keystore.Address)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get nonce: %w", err)
 	}
 	chainID, err := web3.NetworkID(context.Background())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get network ID: %w", err)
 	}
 	block, err := web3.BlockByNumber(context.Background(), nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get block: %w", err)
 	}
 	finishBlock := block.NumberU64() + blocksToMake
 
@@ -185,16 +231,16 @@ func mineBlocks(web3 *ethclient.Client, keystore *keystore.Key, blocksToMake uin
 		spamTX := types.NewTransaction(nonce, keystore.Address, big.NewInt(0), 21000, big.NewInt(1e6), []byte{})
 		signed, err := types.SignTx(spamTX, types.NewEIP155Signer(chainID), keystore.PrivateKey)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to sign transaction: %w", err)
 		}
 		if err = web3.SendTransaction(context.Background(), signed); err != nil {
-			return err
+			return fmt.Errorf("failed to send transaction: %w", err)
 		}
 		nonce++
 		time.Sleep(timeGapPerMiningTX)
 		block, err = web3.BlockByNumber(context.Background(), nil)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get block: %w", err)
 		}
 	}
 	return nil

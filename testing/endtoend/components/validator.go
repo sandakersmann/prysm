@@ -214,15 +214,15 @@ func (v *ValidatorNode) Started() <-chan struct{} {
 }
 
 // SendAndMineDeposits sends the requested amount of deposits and mines the chain after to ensure the deposits are seen.
-func SendAndMineDeposits(keystorePath string, validatorNum, offset int, partial bool) error {
-	client, err := rpc.DialHTTP(fmt.Sprintf("http://127.0.0.1:%d", e2e.TestParams.Eth1RPCPort))
+func SendAndMineDeposits(eth1Nodes *Eth1NodeSet, validatorNum, offset int, partial bool) error {
+	client, err := rpc.DialHTTP(fmt.Sprintf("http://127.0.0.1:%d", e2e.TestParams.Eth1RPCPort+10*offset))
 	if err != nil {
 		return err
 	}
 	defer client.Close()
 	web3 := ethclient.NewClient(client)
 
-	keystoreBytes, err := ioutil.ReadFile(keystorePath) // #nosec G304
+	keystoreBytes, err := ioutil.ReadFile(eth1Nodes.keystorePath) // #nosec G304
 	if err != nil {
 		return err
 	}
