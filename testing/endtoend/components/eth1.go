@@ -109,8 +109,6 @@ func (node *Eth1Node) Start(ctx context.Context) error {
 		}
 	}
 
-	fmt.Printf("Eth1 HTTP port: " + strconv.Itoa(e2e.TestParams.Eth1RPCPort+10*node.index))
-
 	args := []string{
 		fmt.Sprintf("--datadir=%s", eth1Path),
 		fmt.Sprintf("--http.port=%d", e2e.TestParams.Eth1RPCPort+10*node.index),
