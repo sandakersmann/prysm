@@ -3,6 +3,7 @@ package stateutil_test
 import (
 	"testing"
 
+	"github.com/klauspost/cpuid"
 	types "github.com/prysmaticlabs/eth2-types"
 	"github.com/prysmaticlabs/prysm/beacon-chain/state"
 	"github.com/prysmaticlabs/prysm/beacon-chain/state/stateutil"
@@ -89,7 +90,7 @@ func TestReturnTrieLayerVariable_OK(t *testing.T) {
 	newRoot, err = stateutil.AddInMixin(newRoot, uint64(len(validators)))
 	require.NoError(t, err)
 	assert.Equal(t, root, newRoot)
-
+	t.Errorf("CPU flags supported: %s", cpuid.CPU.Features.String())
 	flags := &features.Flags{}
 	flags.EnableVectorizedHTR = true
 	reset := features.InitWithReset(flags)
