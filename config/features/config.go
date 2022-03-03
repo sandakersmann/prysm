@@ -33,6 +33,11 @@ var log = logrus.WithField("prefix", "flags")
 const enabledFeatureFlag = "Enabled feature flag"
 const disabledFeatureFlag = "Disabled feature flag"
 
+func init() {
+	featureConfig = &Flags{}
+	featureConfig.EnableVectorizedHTR = true
+}
+
 // Flags is a struct to represent which features the client will perform on runtime.
 type Flags struct {
 	// Testnet Flags.
