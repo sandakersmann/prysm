@@ -1,7 +1,11 @@
 package htr
 
+/*
+#include <hashtree.h>
+*/
+import "C"
 import (
-	"github.com/prysmaticlabs/gohashtree"
+	"unsafe"
 )
 
 // VectorizedSha256 takes a list of roots and hashes them using CPU
@@ -10,8 +14,6 @@ import (
 // performance improvement compared to the default method of hashing
 // lists.
 func VectorizedSha256(inputList [][32]byte, outputList [][32]byte) {
-	err := gohashtree.Hash(outputList, inputList)
-	if err != nil {
-		panic(err)
-	}
+	sPtr := unsafe.Pointer(&inputList[0])
+	C.sha256_8_avx2((*C.uchar)(unsafe.Pointer(&outputList[0])), (*C.uchar)(sPtr), C.ulong(len(inputList)/2))
 }
