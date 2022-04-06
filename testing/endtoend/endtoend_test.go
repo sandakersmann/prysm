@@ -7,8 +7,6 @@ package endtoend
 import (
 	"context"
 	"fmt"
-	"github.com/prysmaticlabs/prysm/api/client/beacon"
-	"github.com/prysmaticlabs/prysm/io/file"
 	"os"
 	"path"
 	"strings"
@@ -18,9 +16,11 @@ import (
 
 	"github.com/pkg/errors"
 	types "github.com/prysmaticlabs/eth2-types"
+	"github.com/prysmaticlabs/prysm/api/client/beacon"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/transition"
 	"github.com/prysmaticlabs/prysm/config/params"
 	"github.com/prysmaticlabs/prysm/encoding/bytesutil"
+	"github.com/prysmaticlabs/prysm/io/file"
 	"github.com/prysmaticlabs/prysm/proto/eth/service"
 	v1 "github.com/prysmaticlabs/prysm/proto/eth/v1"
 	eth "github.com/prysmaticlabs/prysm/proto/prysm/v1alpha1"
