@@ -78,6 +78,11 @@ func newTestRunner(t *testing.T, config *e2etypes.E2EConfig) *testRunner {
 // run executes configured E2E test.
 func (r *testRunner) run() {
 	t, config := r.t, r.config
+	err := config.WriteBeaconChainConfig()
+	if err != nil {
+		t.Fatalf("failed to write BeaconChainConfig to bazel sandbox")
+	}
+
 	t.Logf("Shard index: %d\n", e2e.TestParams.TestShardIndex)
 	t.Logf("Starting time: %s\n", time.Now().String())
 	t.Logf("Log Path: %s\n", e2e.TestParams.LogPath)
