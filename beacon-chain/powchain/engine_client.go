@@ -29,6 +29,8 @@ const (
 	ExecutionBlockByHashMethod = "eth_getBlockByHash"
 	// ExecutionBlockByNumberMethod request string for JSON-RPC.
 	ExecutionBlockByNumberMethod = "eth_getBlockByNumber"
+	// BlobsBundleMethod request string for JSON-RPC.
+	BlobsBundleMethod = "getBlobsBundleV1"
 )
 
 // ForkchoiceUpdatedResponse is the response kind received by the
@@ -51,6 +53,7 @@ type EngineCaller interface {
 	) error
 	LatestExecutionBlock(ctx context.Context) (*pb.ExecutionBlock, error)
 	ExecutionBlockByHash(ctx context.Context, hash common.Hash) (*pb.ExecutionBlock, error)
+	GetBlobsBundle(ctx context.Context, payloadId [8]byte) (*pb.BlobsBundle, error)
 }
 
 // NewPayload calls the engine_newPayloadV1 method via JSON-RPC.
@@ -199,6 +202,13 @@ func (s *Service) ExecutionBlockByHash(ctx context.Context, hash common.Hash) (*
 
 	result := &pb.ExecutionBlock{}
 	err := s.rpcClient.CallContext(ctx, result, ExecutionBlockByHashMethod, hash, false /* no full transaction objects */)
+	return result, handleRPCError(err)
+}
+
+// GetBlobsBundle calls the getBlobsBundleV1 method via JSON-RPC.
+func (s *Service) GetBlobsBundle(ctx context.Context, payloadId [8]byte) (*pb.BlobsBundle, error) {
+	result := &pb.BlobsBundle{}
+	err := s.rpcClient.CallContext(ctx, result, BlobsBundleMethod, pb.PayloadIDBytes(payloadId))
 	return result, handleRPCError(err)
 }
 

@@ -74,7 +74,7 @@ func (e *ExecutionBlock) MarshalJSON() ([]byte, error) {
 	size := new(big.Int).SetBytes(e.Size)
 	sizeHex := hexutil.EncodeBig(size)
 
-	baseFee := new(big.Int).SetBytes(bytesutil.ReverseByteOrder(e.BaseFeePerGas))
+	baseFee := new(big.Int).SetBytes(e.BaseFeePerGas)
 	baseFeeHex := hexutil.EncodeBig(baseFee)
 	return json.Marshal(executionBlockJSON{
 		Number:           numHex,
@@ -143,7 +143,7 @@ func (e *ExecutionBlock) UnmarshalJSON(enc []byte) error {
 	if err != nil {
 		return err
 	}
-	e.BaseFeePerGas = bytesutil.PadTo(bytesutil.ReverseByteOrder(baseFee.Bytes()), fieldparams.RootLength)
+	e.BaseFeePerGas = baseFee.Bytes()
 	transactions := make([][]byte, len(dec.Transactions))
 	for i, tx := range dec.Transactions {
 		transactions[i] = tx
@@ -352,5 +352,59 @@ func (f *ForkchoiceState) UnmarshalJSON(enc []byte) error {
 	f.HeadBlockHash = dec.HeadBlockHash
 	f.SafeBlockHash = dec.SafeBlockHash
 	f.FinalizedBlockHash = dec.FinalizedBlockHash
+	return nil
+}
+
+type blobBundleJSON struct {
+	BlockHash hexutil.Bytes   `json:"blockHash"`
+	Kzgs      []hexutil.Bytes `json:"kzgs"`
+	Blobs     []hexutil.Bytes `json:"blobs"`
+}
+
+// MarshalJSON --
+func (b *BlobsBundle) MarshalJSON() ([]byte, error) {
+	kzgs := make([]hexutil.Bytes, len(b.Kzg))
+	for i, kzg := range b.Kzg {
+		kzgs[i] = kzg
+	}
+	blobs := make([]hexutil.Bytes, len(b.Blobs))
+	for i, blob := range b.Blobs {
+		var flattenBlob []byte
+		for _, bytes := range blob.Blob {
+			flattenBlob = append(flattenBlob, bytes...)
+		}
+		blobs[i] = flattenBlob
+	}
+	return json.Marshal(blobBundleJSON{
+		BlockHash: b.BlockHash,
+		Kzgs:      kzgs,
+		Blobs:     blobs,
+	})
+}
+
+// UnmarshalJSON --
+func (e *BlobsBundle) UnmarshalJSON(enc []byte) error {
+	dec := blobBundleJSON{}
+	if err := json.Unmarshal(enc, &dec); err != nil {
+		return err
+	}
+	*e = BlobsBundle{}
+	e.BlockHash = bytesutil.PadTo(dec.BlockHash, fieldparams.RootLength)
+	kzgs := make([][]byte, len(dec.Kzgs))
+	for i, kzg := range dec.Kzgs {
+		kzgs[i] = bytesutil.PadTo(kzg, fieldparams.BLSPubkeyLength)
+	}
+	e.Kzg = kzgs
+	blobs := make([]*Blob, len(dec.Blobs))
+	for i, blob := range dec.Blobs {
+		b := &Blob{}
+		for x := 0; x < 4096; x++ {
+			for y := 0; y < 32; y++ {
+				b.Blob[x][y] = blob[x*32+y]
+			}
+		}
+		blobs[i] = b
+	}
+	e.Blobs = blobs
 	return nil
 }
