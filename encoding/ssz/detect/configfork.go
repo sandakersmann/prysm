@@ -68,6 +68,8 @@ func FromForkVersion(cv [fieldparams.VersionLength]byte) (*VersionedUnmarshaler,
 		fork = version.Altair
 	case bytesutil.ToBytes4(cfg.BellatrixForkVersion):
 		fork = version.Bellatrix
+	case bytesutil.ToBytes4(cfg.Eip4844ForkVersion):
+		fork = version.EIP4844
 	default:
 		return nil, errors.Wrapf(ErrForkNotFound, "version=%#x", cv)
 	}
@@ -167,6 +169,8 @@ func (cf *VersionedUnmarshaler) UnmarshalBeaconBlock(marshaled []byte) (block.Si
 		blk = &ethpb.SignedBeaconBlockAltair{}
 	case version.Bellatrix:
 		blk = &ethpb.SignedBeaconBlockBellatrix{}
+	case version.EIP4844:
+		blk = &ethpb.SignedBeaconBlockWithBlobKZGs{}
 	default:
 		forkName := version.String(cf.Fork)
 		return nil, fmt.Errorf("unable to initialize BeaconBlock for fork version=%s at slot=%d", forkName, slot)

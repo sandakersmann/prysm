@@ -104,6 +104,11 @@ func (w eip4844SignedBeaconBlock) PbBellatrixBlock() (*eth.SignedBeaconBlockBell
 	return nil, errors.New("unsupported bellatrix block")
 }
 
+// PbBlindedBellatrixBlock is a stub.
+func (eip4844SignedBeaconBlock) PbBlindedBellatrixBlock() (*eth.SignedBlindedBeaconBlockBellatrix, error) {
+	return nil, ErrUnsupportedBlindedBellatrixBlock
+}
+
 // Version of the underlying protobuf object.
 func (_ eip4844SignedBeaconBlock) Version() int {
 	return version.EIP4844
@@ -227,7 +232,7 @@ type eip4844BeaconBlockBody struct {
 	b *eth.BeaconBlockBodyWithBlobKZGs
 }
 
-// Wrappedeip4844BeaconBlockBody is constructor which wraps a protobuf eip4844 object
+// WrappedEip4844BeaconBlockBody is constructor which wraps a protobuf eip4844 object
 // with the block wrapper.
 func WrappedEip4844BeaconBlockBody(b *eth.BeaconBlockBodyWithBlobKZGs) (block.BeaconBlockBody, error) {
 	w := eip4844BeaconBlockBody{b: b}
@@ -300,4 +305,9 @@ func (w eip4844BeaconBlockBody) Proto() proto.Message {
 
 func (w eip4844BeaconBlockBody) ExecutionPayload() (*enginev1.ExecutionPayload, error) {
 	return w.b.ExecutionPayload, nil
+}
+
+// ExecutionPayloadHeader is a stub.
+func (w eip4844BeaconBlockBody) ExecutionPayloadHeader() (*eth.ExecutionPayloadHeader, error) {
+	return nil, errors.Wrapf(ErrUnsupportedField, "ExecutionPayloadHeader for %T", w)
 }

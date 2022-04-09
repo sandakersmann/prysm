@@ -107,3 +107,4 @@ message BlobsBundle {
 message Blob {
 	repeated bytes blob = 1 [(ethereum.eth.ext.ssz_size) = "4096,32"];
 }
+

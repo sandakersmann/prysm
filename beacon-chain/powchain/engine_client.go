@@ -1,14 +1,10 @@
-// Package v1 defines an API client for the engine API defined in https://github.com/ethereum/execution-apis.
-// This client is used for the Prysm consensus node to connect to execution node as part of
-// the Ethereum proof-of-stake machinery.
-package v1
+package powchain
 
 import (
 	"bytes"
 	"context"
 	"fmt"
 	"math/big"
-	"net/url"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -17,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/config/params"
 	pb "github.com/prysmaticlabs/prysm/proto/engine/v1"
+	"go.opencensus.io/trace"
 )
 
 const (
@@ -34,8 +31,6 @@ const (
 	ExecutionBlockByNumberMethod = "eth_getBlockByNumber"
 	// BlobsBundleMethod request string for JSON-RPC.
 	BlobsBundleMethod = "getBlobsBundleV1"
-	// DefaultTimeout for HTTP.
-	DefaultTimeout = time.Second * 5
 )
 
 // ForkchoiceUpdatedResponse is the response kind received by the
@@ -45,9 +40,9 @@ type ForkchoiceUpdatedResponse struct {
 	PayloadId *pb.PayloadIDBytes `json:"payloadId"`
 }
 
-// Caller defines a client that can interact with an Ethereum
+// EngineCaller defines a client that can interact with an Ethereum
 // execution node's engine service via JSON-RPC.
-type Caller interface {
+type EngineCaller interface {
 	NewPayload(ctx context.Context, payload *pb.ExecutionPayload) ([]byte, error)
 	ForkchoiceUpdated(
 		ctx context.Context, state *pb.ForkchoiceState, attrs *pb.PayloadAttributes,
@@ -59,48 +54,20 @@ type Caller interface {
 	) error
 	LatestExecutionBlock(ctx context.Context) (*pb.ExecutionBlock, error)
 	ExecutionBlockByHash(ctx context.Context, hash common.Hash) (*pb.ExecutionBlock, error)
-}
-
-// Client defines a new engine API client for the Prysm consensus node
-// to interact with an Ethereum execution node.
-type Client struct {
-	cfg *config
-	rpc *rpc.Client
-}
-
-// New returns a ready, engine API client from an endpoint and configuration options.
-// Only http(s) and ipc (inter-process communication) URL schemes are supported.
-func New(ctx context.Context, endpoint string, opts ...Option) (*Client, error) {
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return nil, err
-	}
-	c := &Client{
-		cfg: defaultConfig(),
-	}
-	for _, opt := range opts {
-		if err := opt(c); err != nil {
-			return nil, err
-		}
-	}
-	switch u.Scheme {
-	case "http", "https":
-		c.rpc, err = rpc.DialHTTPWithClient(endpoint, c.cfg.httpClient)
-	case "":
-		c.rpc, err = rpc.DialIPC(ctx, endpoint)
-	default:
-		return nil, errors.Wrapf(ErrUnsupportedScheme, "%q", u.Scheme)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return c, nil
+	GetBlobsBundle(ctx context.Context, payloadId [8]byte) (*pb.BlobsBundle, error)
 }
 
 // NewPayload calls the engine_newPayloadV1 method via JSON-RPC.
-func (c *Client) NewPayload(ctx context.Context, payload *pb.ExecutionPayload) ([]byte, error) {
+func (s *Service) NewPayload(ctx context.Context, payload *pb.ExecutionPayload) ([]byte, error) {
+	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.NewPayload")
+	defer span.End()
+	start := time.Now()
+	defer func() {
+		newPayloadLatency.Observe(float64(time.Since(start).Milliseconds()))
+	}()
+
 	result := &pb.PayloadStatus{}
-	err := c.rpc.CallContext(ctx, result, NewPayloadMethod, payload)
+	err := s.rpcClient.CallContext(ctx, result, NewPayloadMethod, payload)
 	if err != nil {
 		return nil, handleRPCError(err)
 	}
@@ -122,11 +89,18 @@ func (c *Client) NewPayload(ctx context.Context, payload *pb.ExecutionPayload) (
 }
 
 // ForkchoiceUpdated calls the engine_forkchoiceUpdatedV1 method via JSON-RPC.
-func (c *Client) ForkchoiceUpdated(
+func (s *Service) ForkchoiceUpdated(
 	ctx context.Context, state *pb.ForkchoiceState, attrs *pb.PayloadAttributes,
 ) (*pb.PayloadIDBytes, []byte, error) {
+	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.ForkchoiceUpdated")
+	defer span.End()
+	start := time.Now()
+	defer func() {
+		forkchoiceUpdatedLatency.Observe(float64(time.Since(start).Milliseconds()))
+	}()
+
 	result := &ForkchoiceUpdatedResponse{}
-	err := c.rpc.CallContext(ctx, result, ForkchoiceUpdatedMethod, state, attrs)
+	err := s.rpcClient.CallContext(ctx, result, ForkchoiceUpdatedMethod, state, attrs)
 	if err != nil {
 		return nil, nil, handleRPCError(err)
 	}
@@ -150,9 +124,16 @@ func (c *Client) ForkchoiceUpdated(
 }
 
 // GetPayload calls the engine_getPayloadV1 method via JSON-RPC.
-func (c *Client) GetPayload(ctx context.Context, payloadId [8]byte) (*pb.ExecutionPayload, error) {
+func (s *Service) GetPayload(ctx context.Context, payloadId [8]byte) (*pb.ExecutionPayload, error) {
+	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.GetPayload")
+	defer span.End()
+	start := time.Now()
+	defer func() {
+		getPayloadLatency.Observe(float64(time.Since(start).Milliseconds()))
+	}()
+
 	result := &pb.ExecutionPayload{}
-	err := c.rpc.CallContext(ctx, result, GetPayloadMethod, pb.PayloadIDBytes(payloadId))
+	err := s.rpcClient.CallContext(ctx, result, GetPayloadMethod, pb.PayloadIDBytes(payloadId))
 	return result, handleRPCError(err)
 }
 
@@ -164,14 +145,17 @@ func (c *Client) GetBlobsBundle(ctx context.Context, payloadId [8]byte) (*pb.Blo
 }
 
 // ExchangeTransitionConfiguration calls the engine_exchangeTransitionConfigurationV1 method via JSON-RPC.
-func (c *Client) ExchangeTransitionConfiguration(
+func (s *Service) ExchangeTransitionConfiguration(
 	ctx context.Context, cfg *pb.TransitionConfiguration,
 ) error {
+	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.ExchangeTransitionConfiguration")
+	defer span.End()
+
 	// We set terminal block number to 0 as the parameter is not set on the consensus layer.
 	zeroBigNum := big.NewInt(0)
 	cfg.TerminalBlockNumber = zeroBigNum.Bytes()
 	result := &pb.TransitionConfiguration{}
-	if err := c.rpc.CallContext(ctx, result, ExchangeTransitionConfigurationMethod, cfg); err != nil {
+	if err := s.rpcClient.CallContext(ctx, result, ExchangeTransitionConfigurationMethod, cfg); err != nil {
 		return handleRPCError(err)
 	}
 	// We surface an error to the user if local configuration settings mismatch
@@ -203,9 +187,12 @@ func (c *Client) ExchangeTransitionConfiguration(
 
 // LatestExecutionBlock fetches the latest execution engine block by calling
 // eth_blockByNumber via JSON-RPC.
-func (c *Client) LatestExecutionBlock(ctx context.Context) (*pb.ExecutionBlock, error) {
+func (s *Service) LatestExecutionBlock(ctx context.Context) (*pb.ExecutionBlock, error) {
+	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.LatestExecutionBlock")
+	defer span.End()
+
 	result := &pb.ExecutionBlock{}
-	err := c.rpc.CallContext(
+	err := s.rpcClient.CallContext(
 		ctx,
 		result,
 		ExecutionBlockByNumberMethod,
@@ -217,9 +204,19 @@ func (c *Client) LatestExecutionBlock(ctx context.Context) (*pb.ExecutionBlock, 
 
 // ExecutionBlockByHash fetches an execution engine block by hash by calling
 // eth_blockByHash via JSON-RPC.
-func (c *Client) ExecutionBlockByHash(ctx context.Context, hash common.Hash) (*pb.ExecutionBlock, error) {
+func (s *Service) ExecutionBlockByHash(ctx context.Context, hash common.Hash) (*pb.ExecutionBlock, error) {
+	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.ExecutionBlockByHash")
+	defer span.End()
+
 	result := &pb.ExecutionBlock{}
-	err := c.rpc.CallContext(ctx, result, ExecutionBlockByHashMethod, hash, false /* no full transaction objects */)
+	err := s.rpcClient.CallContext(ctx, result, ExecutionBlockByHashMethod, hash, false /* no full transaction objects */)
+	return result, handleRPCError(err)
+}
+
+// GetBlobsBundle calls the getBlobsBundleV1 method via JSON-RPC.
+func (s *Service) GetBlobsBundle(ctx context.Context, payloadId [8]byte) (*pb.BlobsBundle, error) {
+	result := &pb.BlobsBundle{}
+	err := s.rpcClient.CallContext(ctx, result, BlobsBundleMethod, pb.PayloadIDBytes(payloadId))
 	return result, handleRPCError(err)
 }
 
@@ -227,6 +224,9 @@ func (c *Client) ExecutionBlockByHash(ctx context.Context, hash common.Hash) (*p
 func handleRPCError(err error) error {
 	if err == nil {
 		return nil
+	}
+	if isTimeout(err) {
+		return errors.Wrapf(ErrHTTPTimeout, "%s", err)
 	}
 	e, ok := err.(rpc.Error)
 	if !ok {
@@ -255,4 +255,17 @@ func handleRPCError(err error) error {
 	default:
 		return err
 	}
+}
+
+// ErrHTTPTimeout returns true if the error is a http.Client timeout error.
+var ErrHTTPTimeout = errors.New("timeout from http.Client")
+
+type httpTimeoutError interface {
+	Error() string
+	Timeout() bool
+}
+
+func isTimeout(e error) bool {
+	t, ok := e.(httpTimeoutError)
+	return ok && t.Timeout()
 }
